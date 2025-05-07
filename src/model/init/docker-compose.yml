@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: telegram_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: tg_user
+      POSTGRES_PASSWORD: tg_pass
+      POSTGRES_DB: telegram_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./01_create_tables.sql:/docker-entrypoint-initdb.d/01_create_tables.sql
+      - ./02_insert_samples.sql:/docker-entrypoint-initdb.d/02_insert_samples.sql
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
