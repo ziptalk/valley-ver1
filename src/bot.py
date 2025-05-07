@@ -22,9 +22,13 @@ def main():
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", handlers.start_handler))
+    application.add_handler(CommandHandler("menu", handlers.menu_handler))
     application.add_handler(CommandHandler("help", handlers.help_handler))
     application.add_handler(CommandHandler("points", handlers.points_handler))
+    application.add_handler(CommandHandler("point", handlers.points_handler))
     application.add_handler(CommandHandler("ads", handlers.ads_handler))
+    application.add_handler(CommandHandler("ad", handlers.ads_handler))
+    application.add_handler(CommandHandler("language", handlers.language_handler))
     
     application.add_handler(CallbackQueryHandler(handlers.menu_callback, pattern="^menu_"))
     application.add_handler(CallbackQueryHandler(handlers.language_callback, pattern="^lang_"))

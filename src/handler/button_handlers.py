@@ -322,17 +322,28 @@ class ButtonHandlers:
             chat_type = update.effective_chat.type
             with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT content 
+                    SELECT content, url
                     FROM ads 
                     WHERE is_active = TRUE 
                     ORDER BY created_at DESC 
                     LIMIT 1
                 """)
                 result = cur.fetchone()
-                result = result.replace('\\n', '\n')
+                
                 
                 if result:
-                    await context.bot.send_message(chat_id=chat_id, text=result['content'], parse_mode='Markdown')
+                    keyboard = [
+                        [
+                            InlineKeyboardButton("광고 보러가기", url=result['url'])
+                        ]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=result['content'],
+                        reply_markup=reply_markup,
+                        parse_mode='Markdown'
+                    )
                 else:
                     no_ads_error = await self.get_text(chat_type, chat_id, 'AD_MESSAGES')['no_ads_error']
                     await context.bot.send_message(chat_id=chat_id, text=no_ads_error, parse_mode='Markdown')
@@ -341,7 +352,7 @@ class ButtonHandlers:
             ad_fetching_error = await self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_fetching_error']
             await context.bot.send_message(chat_id=chat_id, text=ad_fetching_error, parse_mode='Markdown')
 
-    async def help_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def menu_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Handles the /help command by displaying the main menu with interactive buttons.
         
@@ -376,6 +387,39 @@ class ButtonHandlers:
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
+        
+    async def language_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Handles the /language command by showing the language selection menu.
+        """
+        chat_id = update.effective_chat.id
+        chat_type = update.effective_chat.type
+
+        keyboard = [
+            [
+                InlineKeyboardButton("🇰🇷 한국어", callback_data="lang_ko"),
+                InlineKeyboardButton("🇺🇸 English", callback_data="lang_en")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        language_menu = self.get_text(chat_type, chat_id, 'LANGUAGE_MENU')
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=language_menu,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+    async def help_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
+        
+        help_menu = self.get_text(chat_type, chat_id, 'HELP_MENU')
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=help_menu, 
+            parse_mode='Markdown'
+        )
 
     async def menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -400,7 +444,11 @@ class ButtonHandlers:
         
         if action == 'help':
             help_menu = self.get_text(chat_type, chat_id, 'HELP_MENU')
-            await query.edit_message_text(text=help_menu, parse_mode='Markdown')
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=help_menu, 
+                parse_mode='Markdown'
+            )
             
         elif action == 'points':
             try:
@@ -426,12 +474,14 @@ class ButtonHandlers:
                         points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
                         message = points_menu['group'].format(point=point)
                         
-                await query.edit_message_text(text=message, parse_mode='Markdown')
+                await context.bot.send_message(
+                    chat_id=chat_id, text=message, parse_mode='Markdown'
+                )
                 
             except Exception as e:
                 logging.error(f"Error in points callback: {e}")
                 error_message = self.get_text(chat_type, chat_id, 'POINT_MESSAGES')['points_error']
-                await query.edit_message_text(text=error_message)
+                await context.bot.send_message(chat_id=chat_id, text=error_message)
                 
         elif action == 'ad':
             try:
@@ -487,10 +537,6 @@ class ButtonHandlers:
                                 VALUES (%s, %s, %s, %s)
                             """, (owner_type, chat_id, result['id'], points_to_award))
                             
-                            # Prepare message with points information
-                            points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
-                            current_points = points_menu['private'].format(point=updated_points) if chat_type == 'private' else points_menu['group'].format(point=updated_points)
-                            points_message = ad_menu['points_earned'].format(points=points_to_award) + "\n\n" + current_points
                         else:
                             # Get current points
                             cur.execute("""
@@ -501,22 +547,24 @@ class ButtonHandlers:
                             current_points = cur.fetchone()['point']
                             logging.info(f"Current points: {current_points}")
                             
-                            points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
-                            points_message = ad_menu['already_viewed'] + "\n\n" + (points_menu['private'].format(point=current_points) if chat_type == 'private' else points_menu['group'].format(point=current_points))
-                        
                         message = ad_menu['success'].format(
-                            content=result['content'],
-                            points_message=points_message
+                            content=result['content']
                         )
-                        await query.edit_message_text(text=message, parse_mode='Markdown')
+                        await context.bot.send_message(
+                            chat_id=chat_id, text=message, parse_mode='Markdown'
+                        )
                     else:
                         ad_menu = self.get_text(chat_type, chat_id, 'AD_MENU')
-                        await query.edit_message_text(text=ad_menu['no_ad'])
+                        await context.bot.send_message(
+                            chat_id=chat_id, text=ad_menu['no_ad'], parse_mode='Markdown'
+                        )
                         
             except Exception as e:
                 logging.error(f"Error in ad callback: {e}", exc_info=True)
                 error_message = self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_error']
-                await query.edit_message_text(text=error_message)
+                await context.bot.send_message(
+                    chat_id=chat_id, text=error_message, parse_mode='Markdown'
+                )
                 
         elif action == 'language':
             keyboard = [
@@ -527,7 +575,9 @@ class ButtonHandlers:
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             language_menu = self.get_text(chat_type, chat_id, 'LANGUAGE_MENU')
-            await query.edit_message_text(text=language_menu, reply_markup=reply_markup, parse_mode='Markdown')
+            await context.bot.send_message(
+                chat_id=chat_id, text=language_menu, reply_markup=reply_markup, parse_mode='Markdown'
+            )
 
     async def language_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -568,9 +618,13 @@ class ButtonHandlers:
                 
             lang_messages = self.get_text(chat_type, chat_id, 'LANG_MESSAGES')
             lang_message = lang_messages['language_success_ko'] if selected_lang == 'ko' else lang_messages['language_success_en']
-            await query.edit_message_text(text=lang_message)
+            await context.bot.send_message(
+                chat_id=chat_id, text=lang_message, parse_mode='Markdown'
+            )
             
         except Exception as e:
             logging.error(f"Error in language_callback: {e}")
             error_message = self.get_text(chat_type, chat_id, 'LANG_MESSAGES')['language_error']
-            await query.edit_message_text(text=error_message) 
+            await context.bot.send_message(
+                chat_id=chat_id, text=error_message, parse_mode='Markdown'
+            )

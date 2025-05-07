@@ -55,8 +55,6 @@ Current group points: *{point:,}* points
 AD_MENU = {
     'success': """
 {content}
-
-{points_message}
 """,
     'no_ad': "📢 No active advertisements available.",
     'already_viewed': "ℹ️ You've already viewed an ad today. Points can only be earned once per day.",
