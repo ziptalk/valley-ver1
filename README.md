@@ -1,8 +1,8 @@
-# Valley Telegram Bot
+# Valley Protocol Telegram Bot
 
-텔레그램 봇을 통한 포인트 적립 및 광고 시청 시스템
+Point Accumulation and Ad Viewing System via Telegram Bot
 
-## 기능
+## Features
 
 - User/Group Registration & Management
 - Point System
