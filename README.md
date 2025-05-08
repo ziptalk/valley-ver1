@@ -1,8 +1,8 @@
 # Valley Telegram Bot
 
-텔레그램 봇을 통한 포인트 적립 및 광고 시청 시스템
+Valley Protocol is an AI-powered attention aggregator built for the fragmented Web3 landscape. It delivers personalized, incentive-driven content feeds via Telegram, aligning user interest with project visibility. By embedding AI agents into engagement loops, Valley transforms marketing into an intelligent, cost-efficient attention engine.
 
-## 기능
+## Features
 
 - User/Group Registration & Management
 - Point System
