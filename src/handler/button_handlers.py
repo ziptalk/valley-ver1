@@ -349,14 +349,15 @@ class ButtonHandlers:
                 """)
                 result = cur.fetchone()
                 
-                
                 if result:
-                    keyboard = [
-                        [
-                            InlineKeyboardButton("광고 보러가기", url=result['url'])
+                    # URL이 있는 경우에만 버튼 추가
+                    keyboard = []
+                    if result['url']:
+                        keyboard = [
+                            [InlineKeyboardButton("광고 보러가기", url=result['url'])]
                         ]
-                    ]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+                    
                     await context.bot.send_message(
                         chat_id=chat_id,
                         text=result['content'],
@@ -364,11 +365,11 @@ class ButtonHandlers:
                         parse_mode='Markdown'
                     )
                 else:
-                    no_ads_error = await self.get_text(chat_type, chat_id, 'AD_MESSAGES')['no_ads_error']
+                    no_ads_error = self.get_text(chat_type, chat_id, 'AD_MESSAGES')['no_ads_error']
                     await context.bot.send_message(chat_id=chat_id, text=no_ads_error, parse_mode='Markdown')
         except Exception as e:
             logging.error(f"Error in ads_handler: {e}")
-            ad_fetching_error = await self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_fetching_error']
+            ad_fetching_error = self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_fetching_error']
             await context.bot.send_message(chat_id=chat_id, text=ad_fetching_error, parse_mode='Markdown')
 
     async def claim_val_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
