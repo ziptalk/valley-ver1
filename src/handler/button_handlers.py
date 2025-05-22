@@ -491,8 +491,10 @@ class ButtonHandlers:
             parse_mode='Markdown'
         )
         
-    async def _handle_help_action(self, chat_type: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_help_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """도움말 메뉴 표시"""
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
         help_menu = self.get_text(chat_type, chat_id, 'HELP_MENU')
         await context.bot.send_message(
             chat_id=chat_id,
@@ -500,8 +502,10 @@ class ButtonHandlers:
             parse_mode='Markdown'
         )
 
-    async def _handle_points_action(self, chat_type: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_points_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """포인트 현황 표시"""
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
         try:
             with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
                 if chat_type == 'private':
@@ -542,8 +546,10 @@ class ButtonHandlers:
             error_message = self.get_text(chat_type, chat_id, 'POINT_MESSAGES')['points_error']
             await context.bot.send_message(chat_id=chat_id, text=error_message)
 
-    async def _handle_ad_action(self, chat_type: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_ad_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """광고 표시 및 포인트 지급"""
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
         try:
             with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
                 owner_type = 'user' if chat_type == 'private' else 'group'
@@ -632,8 +638,10 @@ class ButtonHandlers:
                 chat_id=chat_id, text=error_message, parse_mode='Markdown'
             )
 
-    async def _handle_language_action(self, chat_type: str, chat_id: int, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_language_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """언어 설정 메뉴 표시"""
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
         keyboard = [
             [
                 InlineKeyboardButton("🇰🇷 한국어", callback_data="lang_ko"),
@@ -678,7 +686,7 @@ class ButtonHandlers:
         # 해당 action의 처리 함수 실행
         handler = action_handlers.get(action)
         if handler:
-            await handler(chat_type, chat_id, context)
+            await handler(update, context)
         else:
             logging.error(f"Unknown action: {action}")
 
