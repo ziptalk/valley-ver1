@@ -396,14 +396,14 @@ class ButtonHandlers:
                         cur.execute("""
                             UPDATE points 
                             SET point = point - %s 
-                            WHERE owner_type = 'user' AND owner_id = %s AND point >= %s
+                            WHERE owner_type = 'user' AND owner_id = %s
                             RETURNING point
                         """, (points, user_id, points))
                     else:
                         cur.execute("""
                             UPDATE points 
                             SET point = point - %s 
-                            WHERE owner_type = 'group' AND owner_id = %s AND point >= %s
+                            WHERE owner_type = 'group' AND owner_id = %s
                             RETURNING point
                         """, (points, chat_id, points))
                     
@@ -419,6 +419,22 @@ class ButtonHandlers:
                 
         except Exception as e:
             logging.error(f"Error in claim_val_callback: {e}")
+            if chat_type == 'private':
+                cur.execute("""
+                    UPDATE points 
+                    SET point = point + %s 
+                    WHERE owner_type = 'user' AND owner_id = %s
+                    RETURNING point
+                """, (points, user_id, points))
+            else:
+                cur.execute("""
+                    UPDATE points 
+                    SET point = point + %s 
+                    WHERE owner_type = 'group' AND owner_id = %s
+                    RETURNING point
+                """, (points, chat_id, points))
+            
+            result = cur.fetchone()
             await context.bot.send_message(chat_id=chat_id, text="❌ Claim failed: An error occurred", parse_mode='Markdown')
 
     async def menu_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
