@@ -50,7 +50,8 @@ class ButtonHandlers:
                 'AD_MESSAGES': KO_AD_MESSAGES,
                 'POINT_MESSAGES': KO_POINT_MESSAGES,
                 'LANG_MESSAGES': KO_LANG_MESSAGES,
-                'USER_GROUP_MESSAGES': KO_USER_GROUP_MESSAGES
+                'USER_GROUP_MESSAGES': KO_USER_GROUP_MESSAGES,
+                'CLAIM_VAL_MENU': KO_CLAIM_VAL_MENU
             },
             'en': {
                 'MAIN_MENU': EN_MAIN_MENU,
@@ -61,7 +62,8 @@ class ButtonHandlers:
                 'AD_MESSAGES': EN_AD_MESSAGES,
                 'POINT_MESSAGES': EN_POINT_MESSAGES,
                 'LANG_MESSAGES': EN_LANG_MESSAGES,
-                'USER_GROUP_MESSAGES': EN_USER_GROUP_MESSAGES
+                'USER_GROUP_MESSAGES': EN_USER_GROUP_MESSAGES,
+                'CLAIM_VAL_MENU': EN_CLAIM_VAL_MENU
             }
         }
         # 채팅별 언어 설정을 저장하는 딕셔너리
@@ -410,23 +412,14 @@ class ButtonHandlers:
             
             if isSuccess:
                 success_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['success'].format(val=val_amount)
-                await query.edit_message_text(
-                    text=success_message,
-                    parse_mode='Markdown'
-                )
+                await context.bot.send_message(chat_id=chat_id, text=success_message, parse_mode='Markdown')
             else:
                 failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
-                await query.edit_message_text(
-                    text=failed_message,
-                    parse_mode='Markdown'
-                )
+                await context.bot.send_message(chat_id=chat_id, text=failed_message, parse_mode='Markdown')
                 
         except Exception as e:
             logging.error(f"Error in claim_val_callback: {e}")
-            await query.edit_message_text(
-                text="❌ Claim failed: An error occurred",
-                parse_mode='Markdown'
-            )
+            await context.bot.send_message(chat_id=chat_id, text="❌ Claim failed: An error occurred", parse_mode='Markdown')
 
     async def menu_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
