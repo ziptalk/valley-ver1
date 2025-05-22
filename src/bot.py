@@ -23,13 +23,14 @@ def main():
 
     application.add_handler(CommandHandler("start", handlers.start_handler))
     application.add_handler(CommandHandler("menu", handlers.menu_handler))
-    application.add_handler(CommandHandler("help", handlers.help_handler))
-    application.add_handler(CommandHandler("points", handlers.points_handler))
-    application.add_handler(CommandHandler("point", handlers.points_handler))
-    application.add_handler(CommandHandler("ads", handlers.ads_handler))
-    application.add_handler(CommandHandler("ad", handlers.ads_handler))
-    application.add_handler(CommandHandler("language", handlers.language_handler))
+    application.add_handler(CommandHandler("help", handlers._handle_help_action))
+    application.add_handler(CommandHandler("points", handlers._handle_points_action))
+    application.add_handler(CommandHandler("point", handlers._handle_points_action))
+    application.add_handler(CommandHandler("ads", handlers._handle_ad_action))
+    application.add_handler(CommandHandler("ad", handlers._handle_ad_action))
+    application.add_handler(CommandHandler("language", handlers._handle_language_action))
     
+    application.add_handler(CallbackQueryHandler(handlers.claim_val_callback, pattern="^claim_val_"))
     application.add_handler(CallbackQueryHandler(handlers.menu_callback, pattern="^menu_"))
     application.add_handler(CallbackQueryHandler(handlers.language_callback, pattern="^lang_"))
     

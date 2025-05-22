@@ -43,11 +43,27 @@ POINTS_MENU = {
 💰 *Points Status* 💰
 
 Current points: *{point:,}* points
+ ≈ {val:,} Val
 """,
     'group': """
 💰 *Group Points Status* 💰
 
 Current group points: *{point:,}* points
+ ≈ {val:,} Val
+"""
+}
+
+CLAIM_VAL_MENU = {
+  'success': """
+🎉 Claim Successful! 🎉
+
+You have *claimed {val:,} Val* tokens. Val tokens have been sent to your Sui wallet.
+Check your wallet to see your new balance
+""",
+  'failed': """
+⚠️ Not enough points to claim.
+
+You need *at least 10 points* to claim 1 Val.
 """
 }
 

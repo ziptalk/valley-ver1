@@ -11,8 +11,9 @@ from messages.ko_texts import (
     LANGUAGE_MENU as KO_LANGUAGE_MENU,
     AD_MESSAGES as KO_AD_MESSAGES,
     POINT_MESSAGES as KO_POINT_MESSAGES,
+    CLAIM_VAL_MENU as KO_CLAIM_VAL_MENU,
     LANG_MESSAGES as KO_LANG_MESSAGES,
-    USER_GROUP_MESSAGES as KO_USER_GROUP_MESSAGES
+    USER_GROUP_MESSAGES as KO_USER_GROUP_MESSAGES,
 )
 from messages.en_texts import (
     MAIN_MENU as EN_MAIN_MENU,
@@ -22,9 +23,12 @@ from messages.en_texts import (
     LANGUAGE_MENU as EN_LANGUAGE_MENU,
     AD_MESSAGES as EN_AD_MESSAGES,
     POINT_MESSAGES as EN_POINT_MESSAGES,
+    CLAIM_VAL_MENU as EN_CLAIM_VAL_MENU,
     LANG_MESSAGES as EN_LANG_MESSAGES,
     USER_GROUP_MESSAGES as EN_USER_GROUP_MESSAGES
 )
+
+VAL_UNIT = 10
 
 class ButtonHandlers:
     """
@@ -46,7 +50,8 @@ class ButtonHandlers:
                 'AD_MESSAGES': KO_AD_MESSAGES,
                 'POINT_MESSAGES': KO_POINT_MESSAGES,
                 'LANG_MESSAGES': KO_LANG_MESSAGES,
-                'USER_GROUP_MESSAGES': KO_USER_GROUP_MESSAGES
+                'USER_GROUP_MESSAGES': KO_USER_GROUP_MESSAGES,
+                'CLAIM_VAL_MENU': KO_CLAIM_VAL_MENU
             },
             'en': {
                 'MAIN_MENU': EN_MAIN_MENU,
@@ -57,7 +62,8 @@ class ButtonHandlers:
                 'AD_MESSAGES': EN_AD_MESSAGES,
                 'POINT_MESSAGES': EN_POINT_MESSAGES,
                 'LANG_MESSAGES': EN_LANG_MESSAGES,
-                'USER_GROUP_MESSAGES': EN_USER_GROUP_MESSAGES
+                'USER_GROUP_MESSAGES': EN_USER_GROUP_MESSAGES,
+                'CLAIM_VAL_MENU': EN_CLAIM_VAL_MENU
             }
         }
         # 채팅별 언어 설정을 저장하는 딕셔너리
@@ -282,9 +288,10 @@ class ButtonHandlers:
                     """, (user_id,))
                     result = cur.fetchone()
                     point = result['point'] if result else 0
+                    val = round(point / VAL_UNIT, 2)
                     
                     points_menu = self.get_text(chat_type, user_id, 'POINTS_MENU')
-                    message = points_menu['private'].format(point=point)
+                    message = points_menu['private'].format(point=point, val=val)
                 else:
                     cur.execute("""
                         SELECT p.point 
@@ -293,11 +300,22 @@ class ButtonHandlers:
                     """, (chat_id,))
                     result = cur.fetchone()
                     point = result['point'] if result else 0
+                    val = round(point / VAL_UNIT, 2)
                     
                     points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
-                    message = points_menu['group'].format(point=point)
-                    
-            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+                    message = points_menu['group'].format(point=point, val=val)
+            
+            keyboard = [
+                [InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+            
+            await context.bot.send_message(
+                chat_id=chat_id, 
+                text=message, 
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
             
         except Exception as e:
             logging.error(f"Error in points_handler: {e}")
@@ -329,15 +347,17 @@ class ButtonHandlers:
                     LIMIT 1
                 """)
                 result = cur.fetchone()
-                
+                print(f"ads_handler result: {result}")
                 
                 if result:
-                    keyboard = [
-                        [
-                            InlineKeyboardButton("광고 보러가기", url=result['url'])
+                    # URL이 있는 경우에만 버튼 추가
+                    keyboard = []
+                    if result['url']:
+                        keyboard = [
+                            [InlineKeyboardButton("광고 보러가기", url=result['url'])]
                         ]
-                    ]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+                    
                     await context.bot.send_message(
                         chat_id=chat_id,
                         text=result['content'],
@@ -345,12 +365,83 @@ class ButtonHandlers:
                         parse_mode='Markdown'
                     )
                 else:
-                    no_ads_error = await self.get_text(chat_type, chat_id, 'AD_MESSAGES')['no_ads_error']
+                    no_ads_error = self.get_text(chat_type, chat_id, 'AD_MESSAGES')['no_ads_error']
                     await context.bot.send_message(chat_id=chat_id, text=no_ads_error, parse_mode='Markdown')
         except Exception as e:
             logging.error(f"Error in ads_handler: {e}")
-            ad_fetching_error = await self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_fetching_error']
+            ad_fetching_error = self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_fetching_error']
             await context.bot.send_message(chat_id=chat_id, text=ad_fetching_error, parse_mode='Markdown')
+
+    async def claim_val_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        
+        chat_type = update.effective_chat.type
+        owner_type = 'user' if chat_type == 'private' else 'group'
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+
+        try:
+            points = 0
+            with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
+                # Get current points
+                cur.execute("""
+                    SELECT point 
+                    FROM points 
+                    WHERE owner_type = %s AND owner_id = %s
+                """, (owner_type, chat_id))
+                result = cur.fetchone()
+                if result:
+                    points = result['point']
+            
+            if points < 10:  # 최소 10 포인트 필요
+                failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
+                await context.bot.send_message(chat_id=chat_id, text=failed_message, parse_mode='Markdown')
+                return
+
+            # Val로 변환할 포인트 계산 (10의 배수로)
+            points_to_convert = (points // 10) * 10
+            val_amount = points_to_convert / 10
+            
+            with self.db.get_cursor() as cur:
+                try:
+                    cur.execute("BEGIN")
+                    
+                    if chat_type == 'private':
+                        cur.execute("""
+                            UPDATE points 
+                            SET point = point - %s 
+                            WHERE owner_type = 'user' AND owner_id = %s
+                            RETURNING point
+                        """, (points_to_convert, user_id))
+                    else:
+                        cur.execute("""
+                            UPDATE points 
+                            SET point = point - %s 
+                            WHERE owner_type = 'group' AND owner_id = %s
+                            RETURNING point
+                        """, (points_to_convert, chat_id))
+                    
+                    result = cur.fetchone()
+                    if not result:
+                        raise Exception("포인트 차감 실패")
+                    
+                    # TODO: val 지급 처리 로직 추가!
+                    
+                    cur.execute("COMMIT")
+                    
+                    success_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['success'].format(val=val_amount)
+                    await context.bot.send_message(chat_id=chat_id, text=success_message, parse_mode='Markdown')
+                    
+                except Exception as e:
+                    cur.execute("ROLLBACK")
+                    logging.error(f"Error in Claim Val: {e}")
+                    failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
+                    await context.bot.send_message(chat_id=chat_id, text=failed_message, parse_mode='Markdown')
+                
+        except Exception as e:
+            logging.error(f"Error in claim_val_callback: {e}")
+            await context.bot.send_message(chat_id=chat_id, text="❌ Claim failed: An error occurred", parse_mode='Markdown')
 
     async def menu_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -410,15 +501,167 @@ class ButtonHandlers:
             parse_mode='Markdown'
         )
         
-    async def help_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_help_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """도움말 메뉴 표시"""
         chat_type = update.effective_chat.type
         chat_id = update.effective_chat.id
-        
         help_menu = self.get_text(chat_type, chat_id, 'HELP_MENU')
         await context.bot.send_message(
             chat_id=chat_id,
             text=help_menu, 
             parse_mode='Markdown'
+        )
+
+    async def _handle_points_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """포인트 현황 표시"""
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
+        try:
+            with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
+                if chat_type == 'private':
+                    cur.execute("""
+                        SELECT p.point 
+                        FROM points p 
+                        WHERE p.owner_type = 'user' AND p.owner_id = %s
+                    """, (chat_id,))
+                    result = cur.fetchone()
+                    point = result['point'] if result else 0
+                    val = round(point / VAL_UNIT, 2)
+                    points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
+                    message = points_menu['private'].format(point=point, val=val)
+                else:
+                    cur.execute("""
+                        SELECT p.point 
+                        FROM points p 
+                        WHERE p.owner_type = 'group' AND p.owner_id = %s
+                    """, (chat_id,))
+                    result = cur.fetchone()
+                    point = result['point'] if result else 0
+                    val = round(point / VAL_UNIT, 2)
+                    points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
+                    message = points_menu['group'].format(point=point, val=val)
+                    
+                keyboard = [[InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]]
+                reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+                
+                await context.bot.send_message(
+                    chat_id=chat_id, 
+                    text=message, 
+                    reply_markup=reply_markup,
+                    parse_mode='Markdown' 
+                )
+                
+        except Exception as e:
+            logging.error(f"Error in points callback: {e}")
+            error_message = self.get_text(chat_type, chat_id, 'POINT_MESSAGES')['points_error']
+            await context.bot.send_message(chat_id=chat_id, text=error_message)
+
+    async def _handle_ad_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """광고 표시 및 포인트 지급"""
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
+        try:
+            with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
+                owner_type = 'user' if chat_type == 'private' else 'group'
+                logging.info(f"Processing ad action - chat_type: {chat_type}, chat_id: {chat_id}")
+                
+                # Check if user/group has already viewed an ad today
+                cur.execute("""
+                    SELECT id 
+                    FROM ad_view_logs 
+                    WHERE owner_type = %s 
+                    AND owner_id = %s 
+                    AND DATE(viewed_at) = CURRENT_DATE
+                """, (owner_type, chat_id))
+                
+                has_viewed_today = cur.fetchone() is not None
+                logging.info(f"Has viewed today: {has_viewed_today}")
+                
+                # Get a random active advertisement
+                cur.execute("""
+                    SELECT id, content, url, points
+                    FROM ads 
+                    WHERE is_active = TRUE 
+                    ORDER BY RANDOM() 
+                    LIMIT 1
+                """)
+                result = cur.fetchone()
+                logging.info(f"Ad result: {result}")
+                
+                if result:
+                    ad_menu = self.get_text(chat_type, chat_id, 'AD_MENU')
+                    logging.info(f"Ad menu: {ad_menu}")
+                    
+                    if not has_viewed_today:
+                        
+                        # Update points
+                        cur.execute("""
+                            UPDATE points 
+                            SET point = point + %s 
+                            WHERE owner_type = %s AND owner_id = %s
+                            RETURNING point
+                        """, (result['points'], owner_type, chat_id))
+                        
+                        updated_points = cur.fetchone()['point']
+                        logging.info(f"Updated points: {updated_points}")
+                        
+                        # Log the ad view
+                        cur.execute("""
+                            INSERT INTO ad_view_logs (owner_type, owner_id, ad_id, points_earned)
+                            VALUES (%s, %s, %s, %s)
+                        """, (owner_type, chat_id, result['id'], result['points']))
+                        
+                    else:
+                        # Get current points
+                        cur.execute("""
+                            SELECT point 
+                            FROM points 
+                            WHERE owner_type = %s AND owner_id = %s
+                        """, (owner_type, chat_id))
+                        current_points = cur.fetchone()['point']
+                        logging.info(f"Current points: {current_points}")
+                        
+                    message = ad_menu['success'].format(content=result['content'])
+                    
+                    # URL이 있는 경우에만 버튼 추가
+                    keyboard = []
+                    if result['url']:
+                        keyboard = [[InlineKeyboardButton("광고 보러가기", url=result['url'])]]
+                    reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+                    
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=message,
+                        reply_markup=reply_markup,
+                        parse_mode='Markdown'
+                    )
+                else:
+                    ad_menu = self.get_text(chat_type, chat_id, 'AD_MENU')
+                    await context.bot.send_message(
+                        chat_id=chat_id, text=ad_menu['no_ad'], parse_mode='Markdown'
+                    )
+                    
+        except Exception as e:
+            logging.error(f"Error in ad callback: {e}", exc_info=True)
+            error_message = self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_error']
+            await context.bot.send_message(
+                chat_id=chat_id, text=error_message, parse_mode='Markdown'
+            )
+
+    async def _handle_language_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """언어 설정 메뉴 표시"""
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
+        keyboard = [
+            [
+                InlineKeyboardButton("🇰🇷 한국어", callback_data="lang_ko"),
+                InlineKeyboardButton("🇺🇸 English", callback_data="lang_en")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        language_menu = self.get_text(chat_type, chat_id, 'LANGUAGE_MENU')
+        await context.bot.send_message(
+            chat_id=chat_id, text=language_menu, reply_markup=reply_markup, parse_mode='Markdown'
         )
 
     async def menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -442,142 +685,20 @@ class ButtonHandlers:
         chat_type = update.effective_chat.type
         chat_id = update.effective_chat.id
         
-        if action == 'help':
-            help_menu = self.get_text(chat_type, chat_id, 'HELP_MENU')
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=help_menu, 
-                parse_mode='Markdown'
-            )
-            
-        elif action == 'points':
-            try:
-                with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
-                    if chat_type == 'private':
-                        cur.execute("""
-                            SELECT p.point 
-                            FROM points p 
-                            WHERE p.owner_type = 'user' AND p.owner_id = %s
-                        """, (chat_id,))
-                        result = cur.fetchone()
-                        point = result['point'] if result else 0
-                        points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
-                        message = points_menu['private'].format(point=point)
-                    else:
-                        cur.execute("""
-                            SELECT p.point 
-                            FROM points p 
-                            WHERE p.owner_type = 'group' AND p.owner_id = %s
-                        """, (chat_id,))
-                        result = cur.fetchone()
-                        point = result['point'] if result else 0
-                        points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
-                        message = points_menu['group'].format(point=point)
-                        
-                await context.bot.send_message(
-                    chat_id=chat_id, text=message, parse_mode='Markdown'
-                )
-                
-            except Exception as e:
-                logging.error(f"Error in points callback: {e}")
-                error_message = self.get_text(chat_type, chat_id, 'POINT_MESSAGES')['points_error']
-                await context.bot.send_message(chat_id=chat_id, text=error_message)
-                
-        elif action == 'ad':
-            try:
-                with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
-                    owner_type = 'user' if chat_type == 'private' else 'group'
-                    logging.info(f"Processing ad action - chat_type: {chat_type}, chat_id: {chat_id}")
-                    
-                    # Check if user/group has already viewed an ad today
-                    cur.execute("""
-                        SELECT id 
-                        FROM ad_view_logs 
-                        WHERE owner_type = %s 
-                        AND owner_id = %s 
-                        AND DATE(viewed_at) = CURRENT_DATE
-                    """, (owner_type, chat_id))
-                    
-                    has_viewed_today = cur.fetchone() is not None
-                    logging.info(f"Has viewed today: {has_viewed_today}")
-                    
-                    # Get a random active advertisement
-                    cur.execute("""
-                        SELECT id, content 
-                        FROM ads 
-                        WHERE is_active = TRUE 
-                        ORDER BY RANDOM() 
-                        LIMIT 1
-                    """)
-                    result = cur.fetchone()
-                    logging.info(f"Ad result: {result}")
-                    
-                    if result:
-                        ad_menu = self.get_text(chat_type, chat_id, 'AD_MENU')
-                        logging.info(f"Ad menu: {ad_menu}")
-                        
-                        if not has_viewed_today:
-                            # Award points (10 points per view)
-                            points_to_award = 10
-                            
-                            # Update points
-                            cur.execute("""
-                                UPDATE points 
-                                SET point = point + %s 
-                                WHERE owner_type = %s AND owner_id = %s
-                                RETURNING point
-                            """, (points_to_award, owner_type, chat_id))
-                            
-                            updated_points = cur.fetchone()['point']
-                            logging.info(f"Updated points: {updated_points}")
-                            
-                            # Log the ad view
-                            cur.execute("""
-                                INSERT INTO ad_view_logs (owner_type, owner_id, ad_id, points_earned)
-                                VALUES (%s, %s, %s, %s)
-                            """, (owner_type, chat_id, result['id'], points_to_award))
-                            
-                        else:
-                            # Get current points
-                            cur.execute("""
-                                SELECT point 
-                                FROM points 
-                                WHERE owner_type = %s AND owner_id = %s
-                            """, (owner_type, chat_id))
-                            current_points = cur.fetchone()['point']
-                            logging.info(f"Current points: {current_points}")
-                            
-                        message = ad_menu['success'].format(
-                            content=result['content']
-                        )
-                        await context.bot.send_message(
-                            chat_id=chat_id, text=message, parse_mode='Markdown'
-                        )
-                    else:
-                        ad_menu = self.get_text(chat_type, chat_id, 'AD_MENU')
-                        await context.bot.send_message(
-                            chat_id=chat_id, text=ad_menu['no_ad'], parse_mode='Markdown'
-                        )
-                        
-            except Exception as e:
-                logging.error(f"Error in ad callback: {e}", exc_info=True)
-                error_message = self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_error']
-                await context.bot.send_message(
-                    chat_id=chat_id, text=error_message, parse_mode='Markdown'
-                )
-                
-        elif action == 'language':
-            keyboard = [
-                [
-                    InlineKeyboardButton("🇰🇷 한국어", callback_data="lang_ko"),
-                    InlineKeyboardButton("🇺🇸 English", callback_data="lang_en")
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            language_menu = self.get_text(chat_type, chat_id, 'LANGUAGE_MENU')
-            await context.bot.send_message(
-                chat_id=chat_id, text=language_menu, reply_markup=reply_markup, parse_mode='Markdown'
-            )
+        # Action에 따른 처리 함수 매핑
+        action_handlers = {
+            'help': self._handle_help_action,
+            'points': self._handle_points_action,
+            'ad': self._handle_ad_action,
+            'language': self._handle_language_action
+        }
+        
+        # 해당 action의 처리 함수 실행
+        handler = action_handlers.get(action)
+        if handler:
+            await handler(update, context)
+        else:
+            logging.error(f"Unknown action: {action}")
 
     async def language_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """

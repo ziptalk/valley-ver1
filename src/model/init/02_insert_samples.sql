@@ -35,10 +35,10 @@ FROM (VALUES
 JOIN groups g ON g.group_name = t.group_name;
 
 --ads sample data
-INSERT INTO ads (content, is_active)
+INSERT INTO ads (content, url, is_active)
 VALUES 
-('🔥 Get your free credits now! Click here!', TRUE),
-('🚀 Upgrade to premium and unlock features!', FALSE),
-('📢 New version released – check it out!', TRUE),
-('🎁 Invite friends and earn rewards!', FALSE),
-('💬 Join our global Telegram bot challenge!', TRUE);
+('🔥 Get your free credits now! Click here!', 'https://example.com/free-credits', TRUE),
+('🚀 Upgrade to premium and unlock features!', 'https://example.com/premium', FALSE),
+('📢 New version released – check it out!', 'https://example.com/new-version', TRUE),
+('🎁 Invite friends and earn rewards!', 'https://example.com/referral', FALSE),
+('💬 Join our global Telegram bot challenge!', 'https://example.com/challenge', TRUE);
