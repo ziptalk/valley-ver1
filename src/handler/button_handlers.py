@@ -377,31 +377,47 @@ class ButtonHandlers:
         
         chat_type = update.effective_chat.type
         chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
 
-        _, points = query.data.split('_')
-        points = int(points)
-        
         try:
+            # 콜백 데이터에서 포인트 값 추출
+            points = int(query.data.split('_')[-1])
+            
             if points < 10:  # 최소 10 포인트 필요
                 isSuccess = False
+            else:
+                val_amount = round(points / 10, 2)
                 
-            val_amount = points / 10
-            
-            # DB에서 포인트 차감 및 Val 지급 처리
-            # isSuccess = await self.db.claim_val(user_id, points, val_amount)
+                # DB에서 포인트 차감 및 Val 지급 처리
+                with self.db.get_cursor() as cur:
+                    if chat_type == 'private':
+                        cur.execute("""
+                            UPDATE points 
+                            SET point = point - %s 
+                            WHERE owner_type = 'user' AND owner_id = %s AND point >= %s
+                            RETURNING point
+                        """, (points, user_id, points))
+                    else:
+                        cur.execute("""
+                            UPDATE points 
+                            SET point = point - %s 
+                            WHERE owner_type = 'group' AND owner_id = %s AND point >= %s
+                            RETURNING point
+                        """, (points, chat_id, points))
+                    
+                    result = cur.fetchone()
+                    isSuccess = result is not None
             
             if isSuccess:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['success'].format(val=val_amount),
-                    reply_markup=query.message.reply_markup,
+                success_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['success'].format(val=val_amount)
+                await query.edit_message_text(
+                    text=success_message,
                     parse_mode='Markdown'
                 )
             else:
+                failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
                 await query.edit_message_text(
-                    chat_id=chat_id,
-                    text=self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed'],
-                    reply_markup=query.message.reply_markup,
+                    text=failed_message,
                     parse_mode='Markdown'
                 )
                 
@@ -409,7 +425,7 @@ class ButtonHandlers:
             logging.error(f"Error in claim_val_callback: {e}")
             await query.edit_message_text(
                 text="❌ Claim failed: An error occurred",
-                reply_markup=query.message.reply_markup
+                parse_mode='Markdown'
             )
 
     async def menu_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
