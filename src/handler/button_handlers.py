@@ -386,55 +386,52 @@ class ButtonHandlers:
             points = int(query.data.split('_')[-1])
             
             if points < 10:  # 최소 10 포인트 필요
-                isSuccess = False
-            else:
-                val_amount = round(points / 10, 2)
-                
-                # DB에서 포인트 차감 및 Val 지급 처리
-                with self.db.get_cursor() as cur:
+                failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
+                await context.bot.send_message(chat_id=chat_id, text=failed_message, parse_mode='Markdown')
+                return
+
+            # Val로 변환할 포인트 계산 (10의 배수로)
+            points_to_convert = (points // 10) * 10
+            val_amount = points_to_convert / 10
+            
+            with self.db.get_cursor() as cur:
+                try:
+                    cur.execute("BEGIN")
+                    
                     if chat_type == 'private':
                         cur.execute("""
                             UPDATE points 
                             SET point = point - %s 
                             WHERE owner_type = 'user' AND owner_id = %s
                             RETURNING point
-                        """, (points, user_id, points))
+                        """, (points_to_convert, user_id))
                     else:
                         cur.execute("""
                             UPDATE points 
                             SET point = point - %s 
                             WHERE owner_type = 'group' AND owner_id = %s
                             RETURNING point
-                        """, (points, chat_id, points))
+                        """, (points_to_convert, chat_id))
                     
                     result = cur.fetchone()
-                    isSuccess = result is not None
-            
-            if isSuccess:
-                success_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['success'].format(val=val_amount)
-                await context.bot.send_message(chat_id=chat_id, text=success_message, parse_mode='Markdown')
-            else:
-                failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
-                await context.bot.send_message(chat_id=chat_id, text=failed_message, parse_mode='Markdown')
+                    if not result:
+                        raise Exception("포인트 차감 실패")
+                    
+                    # TODO: val 지급 처리 로직 추가!
+                    
+                    cur.execute("COMMIT")
+                    
+                    success_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['success'].format(val=val_amount)
+                    await context.bot.send_message(chat_id=chat_id, text=success_message, parse_mode='Markdown')
+                    
+                except Exception as e:
+                    cur.execute("ROLLBACK")
+                    logging.error(f"Error in Claim Val: {e}")
+                    failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
+                    await context.bot.send_message(chat_id=chat_id, text=failed_message, parse_mode='Markdown')
                 
         except Exception as e:
             logging.error(f"Error in claim_val_callback: {e}")
-            if chat_type == 'private':
-                cur.execute("""
-                    UPDATE points 
-                    SET point = point + %s 
-                    WHERE owner_type = 'user' AND owner_id = %s
-                    RETURNING point
-                """, (points, user_id, points))
-            else:
-                cur.execute("""
-                    UPDATE points 
-                    SET point = point + %s 
-                    WHERE owner_type = 'group' AND owner_id = %s
-                    RETURNING point
-                """, (points, chat_id, points))
-            
-            result = cur.fetchone()
             await context.bot.send_message(chat_id=chat_id, text="❌ Claim failed: An error occurred", parse_mode='Markdown')
 
     async def menu_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
