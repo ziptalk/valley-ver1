@@ -303,11 +303,20 @@ class ButtonHandlers:
                     points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
                     message = points_menu['group'].format(point=point, val=val)
             
-            keyboard = [
-                [InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup, parse_mode='Markdown')
+            # 포인트가 10 이상일 때만 Claim 버튼 표시
+            keyboard = []
+            if point >= 10:
+                keyboard = [
+                    [InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]
+                ]
+            reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+            
+            await context.bot.send_message(
+                chat_id=chat_id, 
+                text=message, 
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
             
         except Exception as e:
             logging.error(f"Error in points_handler: {e}")
@@ -527,8 +536,19 @@ class ButtonHandlers:
                         points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
                         message = points_menu['group'].format(point=point, val=val)
                         
+                # 포인트가 10 이상일 때만 Claim 버튼 표시
+                keyboard = []
+                if point >= 10:
+                    keyboard = [
+                        [InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]
+                    ]
+                reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
+                
                 await context.bot.send_message(
-                    chat_id=chat_id, text=message, parse_mode='Markdown'
+                    chat_id=chat_id, 
+                    text=message, 
+                    reply_markup=reply_markup,
+                    parse_mode='Markdown' 
                 )
                 
             except Exception as e:

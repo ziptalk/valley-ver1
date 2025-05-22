@@ -43,13 +43,13 @@ POINTS_MENU = {
 💰 *Points Status* 💰
 
 Current points: *{point:,}* points
-                ≈ {val:,} Val
+ ≈ {val:,} Val
 """,
     'group': """
 💰 *Group Points Status* 💰
 
 Current group points: *{point:,}* points
-                      ≈ {val:,} Val
+ ≈ {val:,} Val
 """
 }
 
