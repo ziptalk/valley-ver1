@@ -305,7 +305,6 @@ class ButtonHandlers:
                     points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
                     message = points_menu['group'].format(point=point, val=val)
             
-            # 포인트가 10 이상일 때만 Claim 버튼 표시
             keyboard = [
                 [InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]
             ]
@@ -528,10 +527,7 @@ class ButtonHandlers:
                     points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
                     message = points_menu['group'].format(point=point, val=val)
                     
-                # 포인트가 10 이상일 때만 Claim 버튼 표시
-                keyboard = []
-                if point >= 10:
-                    keyboard = [[InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]]
+                keyboard = [[InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]]
                 reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
                 
                 await context.bot.send_message(
