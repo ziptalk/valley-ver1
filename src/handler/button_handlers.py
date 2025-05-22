@@ -377,12 +377,18 @@ class ButtonHandlers:
         await query.answer()
         
         chat_type = update.effective_chat.type
+        owner_type = 'user' if chat_type == 'private' else 'group'
         chat_id = update.effective_chat.id
         user_id = update.effective_user.id
 
         try:
-            # 콜백 데이터에서 포인트 값 추출
-            points = int(query.data.split('_')[-1])
+            # Get current points
+            cur.execute("""
+                SELECT point 
+                FROM points 
+                WHERE owner_type = %s AND owner_id = %s
+            """, (owner_type, chat_id))
+            points = cur.fetchone()['point']
             
             if points < 10:  # 최소 10 포인트 필요
                 failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
