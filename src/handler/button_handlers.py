@@ -348,6 +348,7 @@ class ButtonHandlers:
                     LIMIT 1
                 """)
                 result = cur.fetchone()
+                print(f"ads_handler result: {result}")
                 
                 if result:
                     # URL이 있는 경우에만 버튼 추가

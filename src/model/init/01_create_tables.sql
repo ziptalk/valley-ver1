@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS ads (
         PRIMARY KEY,
     content TEXT 
         NOT NULL,
+    url TEXT,
     created_at TIMESTAMP 
         DEFAULT now(),
     is_active BOOLEAN 
