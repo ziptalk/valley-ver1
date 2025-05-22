@@ -11,8 +11,9 @@ from messages.ko_texts import (
     LANGUAGE_MENU as KO_LANGUAGE_MENU,
     AD_MESSAGES as KO_AD_MESSAGES,
     POINT_MESSAGES as KO_POINT_MESSAGES,
+    CLAIM_VAL_MENU as KO_CLAIM_VAL_MENU,
     LANG_MESSAGES as KO_LANG_MESSAGES,
-    USER_GROUP_MESSAGES as KO_USER_GROUP_MESSAGES
+    USER_GROUP_MESSAGES as KO_USER_GROUP_MESSAGES,
 )
 from messages.en_texts import (
     MAIN_MENU as EN_MAIN_MENU,
@@ -22,9 +23,12 @@ from messages.en_texts import (
     LANGUAGE_MENU as EN_LANGUAGE_MENU,
     AD_MESSAGES as EN_AD_MESSAGES,
     POINT_MESSAGES as EN_POINT_MESSAGES,
+    CLAIM_VAL_MENU as EN_CLAIM_VAL_MENU,
     LANG_MESSAGES as EN_LANG_MESSAGES,
     USER_GROUP_MESSAGES as EN_USER_GROUP_MESSAGES
 )
+
+VAL_UNIT = 10
 
 class ButtonHandlers:
     """
@@ -282,9 +286,10 @@ class ButtonHandlers:
                     """, (user_id,))
                     result = cur.fetchone()
                     point = result['point'] if result else 0
+                    val = round(point / VAL_UNIT, 2)
                     
                     points_menu = self.get_text(chat_type, user_id, 'POINTS_MENU')
-                    message = points_menu['private'].format(point=point)
+                    message = points_menu['private'].format(point=point, val=val)
                 else:
                     cur.execute("""
                         SELECT p.point 
@@ -293,11 +298,16 @@ class ButtonHandlers:
                     """, (chat_id,))
                     result = cur.fetchone()
                     point = result['point'] if result else 0
+                    val = round(point / VAL_UNIT, 2)
                     
                     points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
-                    message = points_menu['group'].format(point=point)
-                    
-            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+                    message = points_menu['group'].format(point=point, val=val)
+            
+            keyboard = [
+                [InlineKeyboardButton("Claim $Val", callback_data=f"claim_val_{point}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup, parse_mode='Markdown')
             
         except Exception as e:
             logging.error(f"Error in points_handler: {e}")
@@ -351,6 +361,47 @@ class ButtonHandlers:
             logging.error(f"Error in ads_handler: {e}")
             ad_fetching_error = await self.get_text(chat_type, chat_id, 'AD_MESSAGES')['ad_fetching_error']
             await context.bot.send_message(chat_id=chat_id, text=ad_fetching_error, parse_mode='Markdown')
+
+    async def claim_val_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+        
+        chat_type = update.effective_chat.type
+        chat_id = update.effective_chat.id
+
+        _, points = query.data.split('_')
+        points = int(points)
+        
+        try:
+            if points < 10:  # 최소 10 포인트 필요
+                isSuccess = False
+                
+            val_amount = points / 10
+            
+            # DB에서 포인트 차감 및 Val 지급 처리
+            # isSuccess = await self.db.claim_val(user_id, points, val_amount)
+            
+            if isSuccess:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['success'].format(val=val_amount),
+                    reply_markup=query.message.reply_markup,
+                    parse_mode='Markdown'
+                )
+            else:
+                await query.edit_message_text(
+                    chat_id=chat_id,
+                    text=self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed'],
+                    reply_markup=query.message.reply_markup,
+                    parse_mode='Markdown'
+                )
+                
+        except Exception as e:
+            logging.error(f"Error in claim_val_callback: {e}")
+            await query.edit_message_text(
+                text="❌ Claim failed: An error occurred",
+                reply_markup=query.message.reply_markup
+            )
 
     async def menu_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -461,8 +512,9 @@ class ButtonHandlers:
                         """, (chat_id,))
                         result = cur.fetchone()
                         point = result['point'] if result else 0
+                        val = round(point / VAL_UNIT, 2)
                         points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
-                        message = points_menu['private'].format(point=point)
+                        message = points_menu['private'].format(point=point,val=val)
                     else:
                         cur.execute("""
                             SELECT p.point 
@@ -471,8 +523,9 @@ class ButtonHandlers:
                         """, (chat_id,))
                         result = cur.fetchone()
                         point = result['point'] if result else 0
+                        val = round(point / VAL_UNIT, 2)
                         points_menu = self.get_text(chat_type, chat_id, 'POINTS_MENU')
-                        message = points_menu['group'].format(point=point)
+                        message = points_menu['group'].format(point=point, val=val)
                         
                 await context.bot.send_message(
                     chat_id=chat_id, text=message, parse_mode='Markdown'

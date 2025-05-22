@@ -30,6 +30,7 @@ def main():
     application.add_handler(CommandHandler("ad", handlers.ads_handler))
     application.add_handler(CommandHandler("language", handlers.language_handler))
     
+    application.add_handler(CallbackQueryHandler(handlers.claim_val_callback, pattern="^claim_val_"))
     application.add_handler(CallbackQueryHandler(handlers.menu_callback, pattern="^menu_"))
     application.add_handler(CallbackQueryHandler(handlers.language_callback, pattern="^lang_"))
     
