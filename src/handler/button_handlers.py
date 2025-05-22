@@ -383,14 +383,16 @@ class ButtonHandlers:
 
         try:
             points = 0
-            with self.db.get_cursor() as cur:
+            with self.db.get_cursor(cursor_factory=RealDictCursor) as cur:
                 # Get current points
                 cur.execute("""
                     SELECT point 
                     FROM points 
                     WHERE owner_type = %s AND owner_id = %s
                 """, (owner_type, chat_id))
-                points = cur.fetchone()['point']
+                result = cur.fetchone()
+                if result:
+                    points = result['point']
             
             if points < 10:  # 최소 10 포인트 필요
                 failed_message = self.get_text(chat_type, chat_id, 'CLAIM_VAL_MENU')['failed']
